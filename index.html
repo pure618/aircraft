@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>API Integration</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.2/css/bootstrap.min.css"
+          type="text/css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.css"
+          type="text/css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        h2 {
+            margin-bottom: 20px;
+        }
+
+        .root {
+            padding: 20px;
+            width: 1200px;
+            margin: 50px auto;
+        }
+
+        .status .col {
+            padding: 15px;
+        }
+
+        .status .col div {
+            padding: 10px 50px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .status .col:first-child {
+            border-right: 1px solid #ced4da;
+        }
+
+        .status .col span {
+            margin-left: 10px;
+        }
+
+        .aircraft-list {
+            margin-top: 50px;
+        }
+
+        .aircraft-list td,
+        .aircraft-list th {
+            border-top: 1px solid #ACACAC;
+            padding: 10px;
+            text-align: center !important;
+        }
+
+        .btn-visibility:after {
+            content: 'Show ˅';
+
+        }
+
+        .btn-visibility.hidden:after {
+            content: 'Hide ˄';
+        }
+
+        .graph {
+            margin: 30px auto;
+        }
+
+        .graph-sm {
+            width: 600px;
+            height: 300px;
+            margin: 30px auto;
+        }
+
+        .total-aircraft {
+            background: #727272;
+            padding: 3px 10px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+<div class="root">
+    <h2>Fleet Flight Hours</h2>
+    <div class="d-flex status">
+        <div class="col">
+            <div>
+                <b>Total Fleet Hours This Year</b>
+                <span id="thisyear_hours">0</span>
+            </div>
+            <div>
+                <b>Average Annual Hours per Aircraft</b>
+                <span id="avg_annual">0</span>
+            </div>
+        </div>
+        <div class="col">
+            <div>
+                <b>Average Misson Length (hours)</b>
+                <span id="avg_mission">0</span>
+            </div>
+            <div>
+                <b>Average Monthly Hours per Aircraft</b>
+                <span id="avg_monthly">0</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="graph">
+        <canvas id="graph"></canvas>
+    </div>
+
+    <a class="btn btn-primary" onclick="getData()">getData</a>
+
+    <table class="aircraft-list" id="aircraft_list">
+        <thead>
+        <tr>
+            <th>Registration Number</th>
+            <th>Serial Number</th>
+            <th>Owner Name</th>
+            <th>Country</th>
+            <th>Avg Monthly Hours</th>
+            <th>2021 Total Hours</th>
+            <th>Avg Mission Length</th>
+            <th>Hours Graph</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td colspan="8">Empty Data</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="text-center" style="margin-top: 20px;">
+        <label class="total-aircraft">Total Aircraft: <span id="total_aircraft">0</span></label>
+    </div>
+</div>
+
+<script>
+    const is_saved = true;
+    const bearerToken = '7af24899d824abfefac14930baf681f40e4427fd';
+
+    function formatNumber(x) {
+        return parseInt(x).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    var countryList;
+    var table;
+    getCountryList();
+    function getCountryList() {
+        fetch("./country_code.json")
+            .then(response => response.json())
+            .then(json => {
+                countryList = json;
+            });
+    }
+
+    function getCountryFromRegistration(registration) {
+        let countryCode = "";
+        let secondCode = "";
+        if (registration.startsWith("N")) {
+            return "USA";
+        } else {
+            let arr = registration.split("-");
+            countryCode = arr[0];
+            switch (countryCode) {
+                case "B":
+                    secondCode = arr[1][0];
+                    switch (secondCode) {
+                        case "H":
+                        case "K":
+                        case "L":
+                            return "HongKong";
+                        case "M":
+                            return "Macau";
+                        default:
+                            return "China";
+                    }
+                case "F":
+                    secondCode = arr[1].substr(0, 2);
+                    switch (secondCode) {
+                        case "OD":
+                            return "Réunion Island";
+                        case "OG":
+                            return "French West Indies";
+                        case "OH":
+                            return "Tahiti";
+                        case "OM":
+                            return "Martinique";
+                        case "O":
+                            return "French Guiana";
+                        default:
+                            return "France";
+                    }
+                case "SU":
+                    secondCode = arr[1][0];
+                    return secondCode === "Y" ? "Palestine" : "Egypt";
+                case "VP":
+                    secondCode = arr[1][0];
+                    switch (secondCode) {
+                        case "A":
+                            return "Anguilla";
+                        case "B":
+                            return "Bermuda";
+                        case "C":
+                            return "Cayman Islands";
+                        case "F":
+                            return "Falkland Islands";
+                        case "G":
+                            return "Gibraltar";
+                        case "L":
+                            return "British Virgin Islands";
+                        case "M":
+                            return "Montserrat";
+                        default:
+                            return "";
+                    }
+                case "VQ":
+                    secondCode = arr[1][0];
+                    return secondCode === "H" ? "Saint Helena/Ascension" : "Turks and Caicos";
+                default:
+                    return countryList[countryCode];
+            }
+        }
+    }
+
+    function invalidate(result) {
+        let aircraft_list = result['aircraft'];
+        $('#aircraft_list tbody').empty();
+
+        let totalGraphData = {};
+        let totalHours = 0;
+        let thisYearHours = 0;
+        let totalAircraft = 0;
+        let totalFlights = 0;
+        let cnt = 0;
+        const thisYear = (new Date()).getFullYear();
+
+        for (let i = 0; i < aircraft_list.length; i++) {
+            const aircraft = aircraft_list[i];
+            let registration = aircraft['registration'];
+            let serialNumber = aircraft['serialNumber'];
+            let owner = aircraft['companyName'] ?? '-';
+            let country = getCountryFromRegistration(registration);
+
+            let statistics = aircraft['aircraftStatitics'];
+            let aircraftHours = 0;
+            let aircraftMonths = 0;
+            let aircraftFlights = 0;
+
+            let graphData = {};
+
+            if (statistics) {
+                for (let j = 0; j < statistics.length; j++) {
+                    let year = statistics[j].year;
+                    let month = statistics[j].month;
+                    if (graphData[year] == undefined) {
+                        graphData[year] = {};
+                    }
+                    graphData[year][month] = (graphData[year][month] ?? 0) + statistics[j].duration;
+                    if (totalGraphData[year] == undefined) {
+                        totalGraphData[year] = {};
+                    }
+                    totalGraphData[year][month] = (totalGraphData[year][month] ?? 0) + statistics[j].duration;
+                    if (year === 2021) {
+                        aircraftHours += statistics[j].duration;
+                    }
+                    if (year == thisYear) {
+                        thisYearHours += statistics[j].duration;
+                    }
+                    totalHours += statistics[j].duration;
+                    totalFlights += statistics[j].flights;
+                    aircraftMonths++;
+                    aircraftFlights += statistics[j].flights;
+                }
+            }
+            let avgMonthly = aircraftMonths === 0 ? 0 : aircraftHours / aircraftMonths;
+            let avgMission = aircraftFlights === 0 ? 0 : aircraftHours / aircraftFlights;
+
+            addTr(registration, serialNumber, owner, country, aircraftHours.toFixed(2), avgMonthly.toFixed(2), avgMission.toFixed(2), JSON.stringify(graphData));
+            totalAircraft++;
+        }
+
+        drawGraph(document.getElementById('graph'), totalGraphData);
+        $('#thisyear_hours').text(formatNumber(thisYearHours));
+        $('#avg_annual').text((totalHours / totalAircraft / 4).toFixed(2));
+        $('#avg_mission').text((totalHours / totalFlights).toFixed(2));
+        $('#avg_monthly').text((totalHours / totalAircraft / 48).toFixed(2));
+        $('#total_aircraft').text(formatNumber(totalAircraft));
+        drawDataTable();
+    }
+
+    function getData() {
+        fetch("./data-output.json")
+            .then(response => {
+                if (response.ok) {
+                    response.json()
+                }
+            })
+            .then(result => {
+                invalidate(result);
+            });
+    }
+
+    function addTr(registration, serialNumber, owner, country, aircraftHours, avgMonthly, avgMission, graphData) {
+        $('#aircraft_list tbody').append(`
+        <tr>
+            <td>${registration}</td>
+            <td>${serialNumber}</td>
+            <td>${owner}</td>
+            <td>${country}</td>
+            <td>${avgMonthly}</td>
+            <td>${aircraftHours}</td>
+            <td>${avgMission}</td>
+            <td><a class="btn btn-secondary btn-visibility" onclick="onToggleBtn(this)"></a></td>
+            <input type="hidden" value='${graphData}' class="graphData"/>
+        </tr>`);
+    }
+
+
+    function onToggleBtn(obj) {
+        $(obj).toggleClass('hidden');
+        var tr = $(obj).parent().parent();
+        var row = table.row(tr);
+
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        } else {
+            // Open this row
+            row.child(drawSubGraph(JSON.parse(tr.find('.graphData').val()))).show();
+        }
+    }
+
+    function drawSubGraph(data) {
+        let div = document.createElement("div");
+        div.className = "graph-sm";
+        let canvas = document.createElement("canvas");
+        drawGraph(canvas, data);
+        div.append(canvas);
+        return div;
+    }
+
+    var monthsNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    function drawGraph(canvas, data) {
+        new Chart(canvas, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    data: data[2022],
+                    label: "2022 hours",
+                    borderColor: "#0009F8",
+                    backgroundColor: "#0009F8",
+                    tension: 0.4
+                }, {
+                    data: data[2021],
+                    label: "2021 hours",
+                    borderColor: "#902F29",
+                    backgroundColor: "#902F29",
+                    tension: 0.4
+                }, {
+                    data: data[2020],
+                    label: "2020 hours",
+                    borderColor: "#89EF32",
+                    backgroundColor: "#89EF32",
+                    tension: 0.4
+                }, {
+                    data: data[2019],
+                    label: "2019 hours",
+                    borderColor: "#762DD8",
+                    backgroundColor: "#762DD8",
+                    tension: 0.4
+                }]
+            },
+            options: {
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        align: "start"
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Month',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            callback: function (label, index, labels) {
+                                return monthsNames[index];
+                            }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Hours',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function drawDataTable() {
+        table = $('#aircraft_list').DataTable({
+            dom: 'tpl',
+            ordering: false
+        });
+    }
+</script>
+
+</body>
+</html>
