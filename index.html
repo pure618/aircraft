@@ -18,6 +18,7 @@
         .root {
             padding: 20px;
             width: 1200px;
+            min-width: 1200px;
             margin: 50px auto;
         }
 
@@ -106,8 +107,6 @@
         <canvas id="graph"></canvas>
     </div>
 
-    <a class="btn btn-primary" onclick="getData()">getData</a>
-
     <table class="aircraft-list" id="aircraft_list">
         <thead>
         <tr>
@@ -134,22 +133,62 @@
 </div>
 
 <script>
-    const is_saved = true;
-    const bearerToken = '7af24899d824abfefac14930baf681f40e4427fd';
-
-    function formatNumber(x) {
-        return parseInt(x).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    }
 
     var countryList;
+    var aircraftList;
     var table;
     getCountryList();
+
     function getCountryList() {
         fetch("./country_code.json")
             .then(response => response.json())
             .then(json => {
                 countryList = json;
+                getAircraftList();
             });
+    }
+
+    function getAircraftList() {
+        fetch("./aircraft_type.json")
+            .then(response => response.json())
+            .then(json => {
+                aircraftList = json;
+                testData();
+            });
+    }
+
+    function testData() {
+        $.ajax({
+            url: 'server.php?f=read_data',
+            type: 'GET',
+            success: function (result) {
+                if (result == 'success') {
+                    getData();
+                } else {
+                    alert('It takes long time to write to file\nPlease try after 10 minutes');
+                }
+            }
+        });
+    }
+
+    function getData() {
+        let data = [];
+        for (var i = 0; i < aircraftList.length; i++) {
+            $.ajax({
+                url: aircraftList[i] + '.json',
+                type: 'GET',
+                async: false,
+                dataType: 'json',
+                success: function (result) {
+                    data = data.concat(result['aircraft']);
+                }
+            });
+        }
+        invalidate(data);
+    }
+
+    function formatNumber(x) {
+        return parseInt(x).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     }
 
     function getCountryFromRegistration(registration) {
@@ -221,8 +260,7 @@
         }
     }
 
-    function invalidate(result) {
-        let aircraft_list = result['aircraft'];
+    function invalidate(data) {
         $('#aircraft_list tbody').empty();
 
         let totalGraphData = {};
@@ -233,8 +271,8 @@
         let cnt = 0;
         const thisYear = (new Date()).getFullYear();
 
-        for (let i = 0; i < aircraft_list.length; i++) {
-            const aircraft = aircraft_list[i];
+        for (let i = 0; i < data.length; i++) {
+            const aircraft = data[i];
             let registration = aircraft['registration'];
             let serialNumber = aircraft['serialNumber'];
             let owner = aircraft['companyName'] ?? '-';
@@ -285,18 +323,6 @@
         $('#avg_monthly').text((totalHours / totalAircraft / 48).toFixed(2));
         $('#total_aircraft').text(formatNumber(totalAircraft));
         drawDataTable();
-    }
-
-    function getData() {
-        fetch("./data-output.json")
-            .then(response => {
-                if (response.ok) {
-                    response.json()
-                }
-            })
-            .then(result => {
-                invalidate(result);
-            });
     }
 
     function addTr(registration, serialNumber, owner, country, aircraftHours, avgMonthly, avgMission, graphData) {
