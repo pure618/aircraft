@@ -75,6 +75,22 @@
             padding: 3px 10px;
             color: white;
         }
+
+        .loading {
+            position: fixed;
+            background-color: rgba(0, 0, 0, 0.2);
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .loading > button {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
     </style>
 </head>
 <body>
@@ -130,9 +146,24 @@
     <div class="text-center" style="margin-top: 20px;">
         <label class="total-aircraft">Total Aircraft: <span id="total_aircraft">0</span></label>
     </div>
+
+</div>
+
+<div class="loading" id="loader" style="display: none">
+    <button class="btn btn-primary" type="button" disabled>
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        Loading...
+    </button>
 </div>
 
 <script>
+    $(document).ajaxStart(function() {
+        // show loader on start
+        $("#loader").show();
+    }).ajaxSuccess(function() {
+        // hide loader on success
+        $("#loader").fadeOut();
+    });
 
     var countryList;
     var aircraftList;
@@ -161,6 +192,7 @@
         $.ajax({
             url: 'server.php?f=read_data',
             type: 'GET',
+            timeout: 1000000,
             success: function (result) {
                 if (result == 'success') {
                     getData();
