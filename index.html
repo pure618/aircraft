@@ -383,14 +383,14 @@
 
     function getModelList() {
         jet = $('#jet').val();
-        model = $('#model').val();
+        make = $('#make').val();
         $.ajax({
             url: 'server.php?f=get_model_list',
             type: 'GET',
             dataType: 'json',
             data: {
                 jet: jet,
-                model: model
+                make: make
             },
             success: function (result) {
                 $('#model').html(`<option value="">All</option>`)

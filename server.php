@@ -160,7 +160,7 @@ class Server
         $make = $_GET['make'];
         $sql = "SELECT distinct model FROM tb_aircraft WHERE 1=1";
         if (!empty($jet)) {
-            $sql .= " and aircraft_class = '{jet}'";
+            $sql .= " and aircraft_class = '${jet}'";
         }
         if (!empty($make)) {
             $sql .= " and make = '${make}'";
