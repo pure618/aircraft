@@ -2,14 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>API Integration</title>
+    <title>Airport Heat Map</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.2/css/bootstrap.min.css"
           type="text/css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.css"
           type="text/css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css"
+          type="text/css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.js"></script>
+    <script type="text/javascript" charset="utf8"
+            src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB7zRbK_udn4vYNr4neiaPd71SuyldNIg4&libraries=visualization"></script>
     <style>
         h2 {
             margin-bottom: 20px;
@@ -20,6 +25,11 @@
             width: 1200px;
             min-width: 1200px;
             margin: 50px auto;
+        }
+
+        .status {
+            width: 800px;
+            margin: 30px auto;
         }
 
         .status .col {
@@ -37,15 +47,16 @@
         }
 
         .status .col span {
-            margin-left: 10px;
+            float: right;
         }
 
-        .aircraft-list {
+        .icao-list {
             margin-top: 50px;
+            width: 100%;
         }
 
-        .aircraft-list td,
-        .aircraft-list th {
+        .icao-list td,
+        .icao-list th {
             border-top: 1px solid #ACACAC;
             padding: 10px;
             text-align: center !important;
@@ -70,7 +81,7 @@
             margin: 30px auto;
         }
 
-        .total-aircraft {
+        .total-route {
             background: #727272;
             padding: 3px 10px;
             color: white;
@@ -91,60 +102,138 @@
             top: 50%;
             transform: translate(-50%, -50%);
         }
+
+        .flex-1 {
+            flex: 1;
+        }
+
+        .btn-gray {
+            background: #D9D9D9;
+            border-radius: 20px;
+        }
+
+        .btn-gray:hover {
+            background: #e9e9e9;
+        }
+
+        .filter-box {
+            width: 600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-gap: 20px;
+        }
     </style>
 </head>
 <body>
 <div class="root">
-    <h2>Fleet Flight Hours</h2>
+    <h2>Airport Heat Map</h2>
+
+    <div class="d-flex align-items-center" style="width: 700px; margin: 30px auto;">
+        <div style="min-width: 120px;"><h4>Filters</h4></div>
+<!--        <div class="d-grid flex-1" style="grid-template-columns: repeat(4, 1fr); grid-gap: 10px;">-->
+<!--            <a class="btn btn-gray">Airport Name</a>-->
+<!--            <a class="btn btn-gray">continent</a>-->
+<!--            <a class="btn btn-gray">Country</a>-->
+<!--            <a class="btn btn-gray">City</a>-->
+<!--            <a class="btn btn-gray">Jet Class</a>-->
+<!--            <a class="btn btn-gray">Make</a>-->
+<!--            <a class="btn btn-gray">Model</a>-->
+<!--            <a class="btn btn-gray">Date</a>-->
+<!--        </div>-->
+        <div class="filter-box flex-1">
+            <div id="filter_airport">
+                Airport Name
+                <input type="text" class="form-control" id="airport"/>
+            </div>
+
+            <div id="filter_continent">
+                Continent
+                <select class="form-control" id="continent">
+                    <option value="">All</option>
+                    <option value="Africa">Africa</option>
+                    <option value="Asia">Asia</option>
+                    <option value="Caribbean">Caribbean</option>
+                    <option value="Central America">Central America</option>
+                    <option value="Europe">Europe</option>
+                    <option value="Middle East">Middle East</option>
+                    <option value="North America">North America</option>
+                </select>
+            </div>
+            <div id="filter_country">
+                Country
+                <select class="form-control" id="country">
+                </select>
+            </div>
+            <div id="filter_city">
+                City
+                <select class="form-control" id="city">
+                </select>
+            </div>
+            <div id="filter_jet">
+                Jet Class
+                <select class="form-control" id="jet">
+                </select>
+            </div>
+            <div id="filter_make">
+                Make
+                <select class="form-control" id="make">
+                </select>
+            </div>
+            <div id="filter_model">
+                Model
+                <select class="form-control" id="model">
+                </select>
+            </div>
+            <div id="filter_date">
+                Date
+                <input class="form-control datepicker" id="date"/>
+            </div>
+            <a class="btn btn-gray" onclick="onSearch()">Search</a>
+        </div>
+    </div>
+
+
     <div class="d-flex status">
         <div class="col">
-            <div>
-                <b>Total Fleet Hours This Year</b>
-                <span id="thisyear_hours">0</span>
-            </div>
-            <div>
-                <b>Average Annual Hours per Aircraft</b>
-                <span id="avg_annual">0</span>
-            </div>
+            <b>Total Movements(Year)</b>
+            <span id="movements_year">0</span>
         </div>
         <div class="col">
-            <div>
-                <b>Average Misson Length (hours)</b>
-                <span id="avg_mission">0</span>
-            </div>
-            <div>
-                <b>Average Monthly Hours per Aircraft</b>
-                <span id="avg_monthly">0</span>
-            </div>
+            <b>Total Movements(Last Month)</b>
+            <span id="movements_month">0</span>
         </div>
+    </div>
+
+    <div id="map" style="width: 800px; height: 400px; margin: 0 auto;">
+
     </div>
 
     <div class="graph">
         <canvas id="graph"></canvas>
     </div>
 
-    <table class="aircraft-list" id="aircraft_list">
+    <h4>Most Popular Airports</h4>
+    <table class="icao-list" id="icao_list">
         <thead>
         <tr>
-            <th>Registration Number</th>
-            <th>Serial Number</th>
-            <th>Owner Name</th>
+            <th>Airport Name</th>
+            <th>ICAO Code</th>
+            <th>City</th>
             <th>Country</th>
-            <th>Avg Monthly Hours</th>
-            <th>2021 Total Hours</th>
-            <th>Avg Mission Length</th>
-            <th>Hours Graph</th>
+            <th>Total Movements</th>
+            <th>Most Popular Aircraft</th>
         </tr>
         </thead>
         <tbody>
         <tr>
-            <td colspan="8">Empty Data</td>
+            <td colspan="6">Empty Data</td>
         </tr>
         </tbody>
     </table>
 
     <div class="text-center" style="margin-top: 20px;">
-        <label class="total-aircraft">Total Aircraft: <span id="total_aircraft">0</span></label>
+        <label class="total-route">Total Routes: <span id="total_route">0</span></label>
     </div>
 
 </div>
@@ -157,26 +246,55 @@
 </div>
 
 <script>
-    $(document).ajaxStart(function() {
+    var map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 3,
+        center: {
+            lat: 51.507351,
+            lng: -0.127758
+        },//London
+        mapTypeId: google.maps.MapTypeId.TERRAIN
+    });
+
+    $(document).ready(function () {
+        $('#country').load("country_list.html");
+        $('#city').load("city_list.html");
+        $('#jet').load("jet_list.html");
+        $('#make').load("make_list.html");
+        $('#model').load("model_list.html");
+    });
+
+    $('.datepicker').datepicker({
+        startView: 1,
+        minViewMode: 1,
+        format: 'yyyy-mm'
+    });
+
+    $(document).ajaxStart(function () {
         // show loader on start
         $("#loader").show();
-    }).ajaxSuccess(function() {
+    }).ajaxSuccess(function () {
         // hide loader on success
         $("#loader").fadeOut();
     });
 
     var countryList;
     var aircraftList;
+    var aircraftModelList;
     var table;
+    var airportList;
+    var data = [];
+    var finalList = [];
 
-    /**
-     * Filter here
-     */
-    var typeDescriptionList = [
-        'Bombardier BD-100-1A10 Challenger 300',
-        'Bombardier BD-100-1A10 Challenger 350'
-    ];
-
+    //filter
+    var airport = '';
+    var continent = '';
+    var country = '';
+    var city = '';
+    var jet = '';
+    var make = '';
+    var model = '';
+    var date = '';
+    var heatMap;
 
     getCountryList();
 
@@ -194,6 +312,24 @@
             .then(response => response.json())
             .then(json => {
                 aircraftList = json;
+                getAircraftModelList();
+            });
+    }
+
+    function getAircraftModelList() {
+        fetch("./aircraft_model.json")
+            .then(response => response.json())
+            .then(json => {
+                aircraftModelList = json;
+                getAirportList();
+            });
+    }
+
+    function getAirportList() {
+        fetch("./icao_coordinates.json")
+            .then(response => response.json())
+            .then(json => {
+                airportList = json;
                 testData();
             });
     }
@@ -207,14 +343,14 @@
                 if (result == 'success') {
                     getData();
                 } else {
-                    alert('It takes long time to write to file\nPlease try after 10 minutes');
+                    alert('It takes long time to writxe to file\nPlease try after 10 minutes');
                 }
             }
         });
     }
 
     function getData() {
-        let data = [];
+        data = [];
         for (var i = 0; i < aircraftList.length; i++) {
             $.ajax({
                 url: aircraftList[i] + '.json',
@@ -222,167 +358,152 @@
                 async: false,
                 dataType: 'json',
                 success: function (result) {
-                    for (let j = 0; j < result['aircraft'].length; j++) {
-                        if (typeDescriptionList.indexOf(result['aircraft'][j]['typeDescription']) !== -1) {
+                    if (result['aircraft']) {
+                        for (let j = 0; j < result['aircraft'].length; j++) {
                             data.push(result['aircraft'][j]);
                         }
                     }
                 }
             });
         }
-        invalidate(data);
+        invalidate();
     }
 
     function formatNumber(x) {
         return parseInt(x).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     }
 
-    function getCountryFromRegistration(registration) {
-        let countryCode = "";
-        let secondCode = "";
-        if (registration.startsWith("N")) {
-            return "USA";
-        } else {
-            let arr = registration.split("-");
-            countryCode = arr[0];
-            switch (countryCode) {
-                case "B":
-                    secondCode = arr[1][0];
-                    switch (secondCode) {
-                        case "H":
-                        case "K":
-                        case "L":
-                            return "HongKong";
-                        case "M":
-                            return "Macau";
-                        default:
-                            return "China";
-                    }
-                case "F":
-                    secondCode = arr[1].substr(0, 2);
-                    switch (secondCode) {
-                        case "OD":
-                            return "Réunion Island";
-                        case "OG":
-                            return "French West Indies";
-                        case "OH":
-                            return "Tahiti";
-                        case "OM":
-                            return "Martinique";
-                        case "O":
-                            return "French Guiana";
-                        default:
-                            return "France";
-                    }
-                case "SU":
-                    secondCode = arr[1][0];
-                    return secondCode === "Y" ? "Palestine" : "Egypt";
-                case "VP":
-                    secondCode = arr[1][0];
-                    switch (secondCode) {
-                        case "A":
-                            return "Anguilla";
-                        case "B":
-                            return "Bermuda";
-                        case "C":
-                            return "Cayman Islands";
-                        case "F":
-                            return "Falkland Islands";
-                        case "G":
-                            return "Gibraltar";
-                        case "L":
-                            return "British Virgin Islands";
-                        case "M":
-                            return "Montserrat";
-                        default:
-                            return "";
-                    }
-                case "VQ":
-                    secondCode = arr[1][0];
-                    return secondCode === "H" ? "Saint Helena/Ascension" : "Turks and Caicos";
-                default:
-                    return countryList[countryCode];
-            }
+    function invalidate() {
+        $("#loader").show();
+        if (table) {
+            table.destroy();
         }
-    }
-
-    function invalidate(data) {
-        $('#aircraft_list tbody').empty();
+        $('#icao_list tbody').empty();
+        finalList = [];
 
         let totalGraphData = {};
-        let totalHours = 0;
-        let thisYearHours = 0;
-        let totalAircraft = 0;
-        let totalFlights = 0;
-        let cnt = 0;
+        let yearMovements = 0;
+        let monthMovements = 0;
+
         const thisYear = (new Date()).getFullYear();
+        const lastMonth = (new Date()).getMonth();
 
         for (let i = 0; i < data.length; i++) {
-            const aircraft = data[i];
-            let registration = aircraft['registration'];
-            let serialNumber = aircraft['serialNumber'];
-            let owner = aircraft['companyName'] ?? '-';
-            let country = getCountryFromRegistration(registration);
+            let statistics = data[i]['aircraftStatitics'];
 
-            let statistics = aircraft['aircraftStatitics'];
-            let aircraftHours = 0;
-            let aircraftMonths = 0;
-            let aircraftFlights = 0;
+            const typeDescription = data[i]['typeDescription'];
+            if (!aircraftModelList[typeDescription]) {
+                continue;
+            }
+            if (jet !== '' && (aircraftModelList[typeDescription]['jet'] !== jet)) {
+                continue;
+            }
 
-            let graphData = {};
+            if (make !== '' && (aircraftModelList[typeDescription]['make'] !== make)) {
+                continue;
+            }
+
+            if (model !== '' && (aircraftModelList[typeDescription]['model'] !== model)) {
+                continue;
+            }
 
             if (statistics) {
                 for (let j = 0; j < statistics.length; j++) {
                     let year = statistics[j].year;
                     let month = statistics[j].month;
-                    if (graphData[year] == undefined) {
-                        graphData[year] = {};
+
+                    if (date !== '' && (date !== year + '-' + (month > 10 ? month : '0' + month))) {
+                        continue;
                     }
-                    graphData[year][month] = (graphData[year][month] ?? 0) + statistics[j].duration;
-                    if (totalGraphData[year] == undefined) {
+
+                    let movements = 0;
+                    if (statistics[j].airportMovements) {
+                        for (let k = 0; k < statistics[j].airportMovements.length; k++) {
+                            let icaoCode = statistics[j].airportMovements[k].icaoCode;
+                            if (airportList[icaoCode] === undefined) {
+                                continue;
+                            }
+
+                            if (airport !== '' && (!airportList[icaoCode]['airport'].includes(airport))) {
+                                continue;
+                            }
+
+                            if (continent !== '' && (airportList[icaoCode]['continent'] !== continent)) {
+                                continue;
+                            }
+
+                            if (country !== '' && (airportList[icaoCode]['country'] !== country)) {
+                                continue;
+                            }
+
+                            if (city !== '' && (airportList[icaoCode]['city'] !== city)) {
+                                continue;
+                            }
+
+                            let movement = statistics[j].airportMovements[k].movements;
+                            movements += movement;
+                            if (airportList[icaoCode]) {
+                                if (airportList[icaoCode]['popular_movement'] === undefined) {
+                                    airportList[icaoCode]['popular_movement'] = 0;
+                                }
+                                if (movement > airportList[icaoCode]['popular_movement']) {
+                                    airportList[icaoCode]['popular_movement'] = movement;
+                                    airportList[icaoCode]['popular_aircraft'] = data[i]['typeDescription'];
+                                }
+                                airportList[icaoCode]['count'] = (airportList[icaoCode]['count'] ?? 0) + movement;
+                                if (!finalList.includes(icaoCode)) {
+                                    finalList.push(icaoCode);
+                                }
+                                // if (airportList[icaoCode]['graphData'] === undefined) {
+                                //     airportList[icaoCode]['graphData'] = {};
+                                // }
+                                // if (airportList[icaoCode]['graphData'][year] === undefined) {
+                                //     airportList[icaoCode]['graphData'][year] = {};
+                                // }
+                                // airportList[icaoCode]['graphData'][year][month] = (airportList[icaoCode]['graphData'][year][month] ?? 0) + movement;
+                            }
+                        }
+                    }
+                    if (totalGraphData[year] === undefined) {
                         totalGraphData[year] = {};
                     }
-                    totalGraphData[year][month] = (totalGraphData[year][month] ?? 0) + statistics[j].duration;
-                    if (year === 2021) {
-                        aircraftHours += statistics[j].duration;
+                    totalGraphData[year][month] = (totalGraphData[year][month] ?? 0) + movements;
+                    if (year === thisYear) {
+                        yearMovements += movements;
                     }
-                    if (year == thisYear) {
-                        thisYearHours += statistics[j].duration;
+                    if (year === thisYear && month === lastMonth) {
+                        monthMovements += movements;
                     }
-                    totalHours += statistics[j].duration;
-                    totalFlights += statistics[j].flights;
-                    aircraftMonths++;
-                    aircraftFlights += statistics[j].flights;
                 }
             }
-            let avgMonthly = aircraftMonths === 0 ? 0 : aircraftHours / aircraftMonths;
-            let avgMission = aircraftFlights === 0 ? 0 : aircraftHours / aircraftFlights;
+        }
 
-            addTr(registration, serialNumber, owner, country, aircraftHours.toFixed(2), avgMonthly.toFixed(2), avgMission.toFixed(2), JSON.stringify(graphData));
-            totalAircraft++;
+        $('#icao_list tbody').empty();
+        for (let i = 0; i < finalList.length; i++){
+            const icaoCode = finalList[i];
+            addTr(airportList[icaoCode].airport, airportList[icaoCode].icao, airportList[icaoCode].city, airportList[icaoCode].country, airportList[icaoCode].count, airportList[icaoCode]['popular_aircraft']);
         }
 
         drawGraph(document.getElementById('graph'), totalGraphData);
-        $('#thisyear_hours').text(formatNumber(thisYearHours));
-        $('#avg_annual').text((totalHours / totalAircraft / 4).toFixed(2));
-        $('#avg_mission').text((totalHours / totalFlights).toFixed(2));
-        $('#avg_monthly').text((totalHours / totalAircraft / 48).toFixed(2));
-        $('#total_aircraft').text(formatNumber(totalAircraft));
         drawDataTable();
+        drawHeatMap();
+        $('#total_route').text(formatNumber(finalList.length));
+        $('#movements_year').text(formatNumber(yearMovements));
+        $('#movements_month').text(formatNumber(monthMovements));
+        $("#loader").fadeOut();
     }
 
-    function addTr(registration, serialNumber, owner, country, aircraftHours, avgMonthly, avgMission, graphData) {
-        $('#aircraft_list tbody').append(`
+    function addTr(airport, icao, city, country, totalMovements, popular, graphData) {
+        $('#icao_list tbody').append(`
         <tr>
-            <td>${registration}</td>
-            <td>${serialNumber}</td>
-            <td>${owner}</td>
+            <td>${airport}</td>
+            <td>${icao}</td>
+            <td>${city}</td>
             <td>${country}</td>
-            <td>${avgMonthly}</td>
-            <td>${aircraftHours}</td>
-            <td>${avgMission}</td>
-            <td><a class="btn btn-secondary btn-visibility" onclick="onToggleBtn(this)"></a></td>
-            <input type="hidden" value='${graphData}' class="graphData"/>
+            <td>${totalMovements ?? 0}</td>
+            <td>${popular ?? ''}</td>
+<!--            <td><a class="btn btn-secondary btn-visibility" onclick="onToggleBtn(this)"></a></td>-->
+<!--            <input type="hidden" value='{graphData}' class="graphData"/>-->
         </tr>`);
     }
 
@@ -401,6 +522,23 @@
         }
     }
 
+    function drawHeatMap() {
+        if (heatMap) {
+            heatMap.setMap(null);
+        }
+        let heatmapData = [];
+        for (let i = 0; i < finalList.length; i++){
+            const icaoCode = finalList[i];
+            heatmapData.push({location: new google.maps.LatLng(airportList[icaoCode].lat, airportList[icaoCode].lng), weight: airportList[icaoCode].count});
+        }
+
+        heatMap = new google.maps.visualization.HeatmapLayer({
+            data: heatmapData,
+            radius: 15,
+            map: map,
+        });
+    }
+
     function drawSubGraph(data) {
         let div = document.createElement("div");
         div.className = "graph-sm";
@@ -411,31 +549,36 @@
     }
 
     var monthsNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var chart;
+
     function drawGraph(canvas, data) {
-        new Chart(canvas, {
+        if (chart) {
+            chart.destroy();
+        }
+        chart = new Chart(canvas, {
             type: 'line',
             data: {
                 datasets: [{
                     data: data[2022],
-                    label: "2022 hours",
+                    label: "2022 Movements",
                     borderColor: "#0009F8",
                     backgroundColor: "#0009F8",
                     tension: 0.4
                 }, {
                     data: data[2021],
-                    label: "2021 hours",
+                    label: "2021 Movements",
                     borderColor: "#902F29",
                     backgroundColor: "#902F29",
                     tension: 0.4
                 }, {
                     data: data[2020],
-                    label: "2020 hours",
+                    label: "2020 Movements",
                     borderColor: "#89EF32",
                     backgroundColor: "#89EF32",
                     tension: 0.4
                 }, {
                     data: data[2019],
-                    label: "2019 hours",
+                    label: "2019 Movements",
                     borderColor: "#762DD8",
                     backgroundColor: "#762DD8",
                     tension: 0.4
@@ -467,7 +610,7 @@
                     y: {
                         title: {
                             display: true,
-                            text: 'Hours',
+                            text: 'Movements',
                             font: {
                                 size: 16,
                                 weight: 'bold'
@@ -480,9 +623,21 @@
     }
 
     function drawDataTable() {
-        table = $('#aircraft_list').DataTable({
+        table = $('#icao_list').DataTable({
             dom: 'tpl'
         });
+    }
+
+    function onSearch() {
+        airport = $('#airport').val();
+        continent = $('#continent').val();
+        country = $('#country').val();
+        city = $('#city').val();
+        jet = $('#jet').val();
+        make = $('#make').val();
+        model = $('#model').val();
+        date = $('#date').val();
+        invalidate();
     }
 </script>
 
