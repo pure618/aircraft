@@ -117,10 +117,10 @@
         }
 
         .filter-box {
-            width: 600px;
+            width: 800px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             grid-gap: 20px;
         }
     </style>
@@ -255,14 +255,6 @@
         mapTypeId: google.maps.MapTypeId.TERRAIN
     });
 
-    $(document).ready(function () {
-        $('#country').load("country_list.html");
-        $('#city').load("city_list.html");
-        $('#jet').load("jet_list.html");
-        $('#make').load("make_list.html");
-        $('#model').load("model_list.html");
-    });
-
     $('.datepicker').datepicker({
         startView: 1,
         minViewMode: 1,
@@ -277,7 +269,6 @@
         $("#loader").fadeOut();
     });
 
-    var countryList;
     var aircraftList;
     var aircraftModelList;
     var table;
@@ -297,41 +288,129 @@
     var heatMap;
 
     getCountryList();
+    getMakeList();
+    getModelList();
+    getJetList();
+    getAircraftList();
+
+    $('#continent').change(function () {
+        getCountryList();
+    });
+
+    $('#country').change(function () {
+        getCityList();
+    });
 
     function getCountryList() {
-        fetch("./country_code.json")
-            .then(response => response.json())
-            .then(json => {
-                countryList = json;
-                getAircraftList();
-            });
+        continent = $('#continent').val();
+        $.ajax({
+            url: 'server.php?f=get_country_list',
+            type: 'GET',
+            data: {
+                continent: continent
+            },
+            dataType: 'json',
+            success: function (result) {
+                $('#country').html(`<option value="">All</option>`)
+                for (const item of result) {
+                    $('#country').append(`<option value="${item}">${item}</option>`);
+                }
+                getCityList();
+            }
+        });
+    }
+
+    function getCityList() {
+        continent = $('#continent').val();
+        country = $('#country').val();
+        $.ajax({
+            url: 'server.php?f=get_city_list',
+            type: 'GET',
+            data: {
+                continent: continent,
+                country: country
+            },
+            dataType: 'json',
+            success: function (result) {
+                $('#city').html(`<option value="">All</option>`)
+                for (const item of result) {
+                    $('#city').append(`<option value="${item}">${item}</option>`);
+                }
+            }
+        });
+    }
+
+    function getJetList() {
+        $.ajax({
+            url: 'server.php?f=get_jet_list',
+            type: 'GET',
+            dataType: 'json',
+            success: function (result) {
+                $('#jet').html(`<option value="">All</option>`)
+                for (const item of result) {
+                    $('#jet').append(`<option value="${item}">${item}</option>`);
+                }
+            }
+        });
+    }
+
+    $('#jet').change(function () {
+        getMakeList();
+    });
+
+    $('#make').change(function () {
+        getModelList();
+    });
+
+    function getMakeList() {
+        jet = $('#jet').val();
+        $.ajax({
+            url: 'server.php?f=get_make_list',
+            type: 'GET',
+            dataType: 'json',
+            data: {
+                jet: jet
+            },
+            success: function (result) {
+                $('#make').html(`<option value="">All</option>`)
+                for (const item of result) {
+                    $('#make').append(`<option value="${item}">${item}</option>`);
+                }
+                getModelList();
+            }
+        });
+    }
+
+    function getModelList() {
+        jet = $('#jet').val();
+        model = $('#model').val();
+        $.ajax({
+            url: 'server.php?f=get_model_list',
+            type: 'GET',
+            dataType: 'json',
+            data: {
+                jet: jet,
+                model: model
+            },
+            success: function (result) {
+                $('#model').html(`<option value="">All</option>`)
+                for (const item of result) {
+                    $('#model').append(`<option value="${item}">${item}</option>`);
+                }
+            }
+        });
     }
 
     function getAircraftList() {
-        fetch("./aircraft_type.json")
-            .then(response => response.json())
-            .then(json => {
-                aircraftList = json;
-                getAircraftModelList();
-            });
-    }
-
-    function getAircraftModelList() {
-        fetch("./aircraft_model.json")
-            .then(response => response.json())
-            .then(json => {
-                aircraftModelList = json;
-                getAirportList();
-            });
-    }
-
-    function getAirportList() {
-        fetch("./icao_coordinates.json")
-            .then(response => response.json())
-            .then(json => {
-                airportList = json;
+        $.ajax({
+            url: 'server.php?f=get_aircraft_list',
+            type: 'GET',
+            dataType: 'json',
+            success: function (result) {
+                aircraftList = result;
                 testData();
-            });
+            }
+        });
     }
 
     function testData() {
@@ -366,7 +445,46 @@
                 }
             });
         }
-        invalidate();
+        getAirportList();
+    }
+
+    function getAirportList() {
+        $.ajax({
+            url: 'server.php?f=get_airport_list',
+            type: 'GET',
+            dataType: 'json',
+            data: {
+                continent: continent,
+                country: country,
+                city: city,
+                airport: airport
+            },
+            success: function (result) {
+                airportList = result;
+                getAircraftModelList();
+            }
+        });
+    }
+
+    function getAircraftModelList() {
+        model = $('#model').val();
+        make = $('#make').val();
+        jet = $('#jet').val();
+
+        $.ajax({
+            url: 'server.php?f=get_aircraft_model_list',
+            type: 'GET',
+            dataType: 'json',
+            data: {
+                model: model,
+                jet: jet,
+                make: make
+            },
+            success: function (result) {
+                aircraftModelList = result;
+                invalidate();
+            }
+        });
     }
 
     function formatNumber(x) {
@@ -395,17 +513,6 @@
             if (!aircraftModelList[typeDescription]) {
                 continue;
             }
-            if (jet !== '' && (aircraftModelList[typeDescription]['jet'] !== jet)) {
-                continue;
-            }
-
-            if (make !== '' && (aircraftModelList[typeDescription]['make'] !== make)) {
-                continue;
-            }
-
-            if (model !== '' && (aircraftModelList[typeDescription]['model'] !== model)) {
-                continue;
-            }
 
             if (statistics) {
                 for (let j = 0; j < statistics.length; j++) {
@@ -420,29 +527,9 @@
                     if (statistics[j].airportMovements) {
                         for (let k = 0; k < statistics[j].airportMovements.length; k++) {
                             let icaoCode = statistics[j].airportMovements[k].icaoCode;
-                            if (airportList[icaoCode] === undefined) {
-                                continue;
-                            }
-
-                            if (airport !== '' && (!airportList[icaoCode]['airport'].includes(airport))) {
-                                continue;
-                            }
-
-                            if (continent !== '' && (airportList[icaoCode]['continent'] !== continent)) {
-                                continue;
-                            }
-
-                            if (country !== '' && (airportList[icaoCode]['country'] !== country)) {
-                                continue;
-                            }
-
-                            if (city !== '' && (airportList[icaoCode]['city'] !== city)) {
-                                continue;
-                            }
-
                             let movement = statistics[j].airportMovements[k].movements;
-                            movements += movement;
                             if (airportList[icaoCode]) {
+                                movements += movement;
                                 if (airportList[icaoCode]['popular_movement'] === undefined) {
                                     airportList[icaoCode]['popular_movement'] = 0;
                                 }
@@ -481,7 +568,7 @@
         $('#icao_list tbody').empty();
         for (let i = 0; i < finalList.length; i++){
             const icaoCode = finalList[i];
-            addTr(airportList[icaoCode].airport, airportList[icaoCode].icao, airportList[icaoCode].city, airportList[icaoCode].country, airportList[icaoCode].count, airportList[icaoCode]['popular_aircraft']);
+            addTr(airportList[icaoCode].airport_name, airportList[icaoCode].icao, airportList[icaoCode].city, airportList[icaoCode].country, airportList[icaoCode].count, airportList[icaoCode]['popular_aircraft']);
         }
 
         drawGraph(document.getElementById('graph'), totalGraphData);
@@ -502,8 +589,6 @@
             <td>${country}</td>
             <td>${totalMovements ?? 0}</td>
             <td>${popular ?? ''}</td>
-<!--            <td><a class="btn btn-secondary btn-visibility" onclick="onToggleBtn(this)"></a></td>-->
-<!--            <input type="hidden" value='{graphData}' class="graphData"/>-->
         </tr>`);
     }
 
@@ -637,7 +722,7 @@
         make = $('#make').val();
         model = $('#model').val();
         date = $('#date').val();
-        invalidate();
+        getAirportList();
     }
 </script>
 
