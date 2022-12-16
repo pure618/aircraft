@@ -120,8 +120,12 @@
             width: 800px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: 1fr 1fr 1fr 2fr;
             grid-gap: 20px;
+        }
+
+        .input-daterange {
+            display: flex;
         }
     </style>
 </head>
@@ -129,7 +133,7 @@
 <div class="root">
     <h2>Airport Heat Map</h2>
 
-    <div class="d-flex align-items-center" style="width: 700px; margin: 30px auto;">
+    <div class="d-flex align-items-center" style="width: 900px; margin: 30px auto;">
         <div style="min-width: 120px;"><h4>Filters</h4></div>
 <!--        <div class="d-grid flex-1" style="grid-template-columns: repeat(4, 1fr); grid-gap: 10px;">-->
 <!--            <a class="btn btn-gray">Airport Name</a>-->
@@ -187,9 +191,12 @@
             </div>
             <div id="filter_date">
                 Date
-                <input class="form-control datepicker" id="date"/>
+                <div class="input-daterange" id="datepicker">
+                    <input type="text" class="form-control" id="start" />
+                    <span class="input-group-text">~</span>
+                    <input type="text" class="form-control" id="end" />
+                </div>
             </div>
-            <a class="btn btn-gray" onclick="onSearch()">Search</a>
         </div>
     </div>
 
@@ -255,10 +262,10 @@
         mapTypeId: google.maps.MapTypeId.TERRAIN
     });
 
-    $('.datepicker').datepicker({
-        startView: 1,
-        minViewMode: 1,
-        format: 'yyyy-mm'
+    var start = '';
+    var end = '';
+    $('.input-daterange').datepicker({
+        format: 'yyyy-mm-dd'
     });
 
     $(document).ajaxStart(function () {
@@ -284,7 +291,6 @@
     var jet = '';
     var make = '';
     var model = '';
-    var date = '';
     var heatMap;
 
     getCountryList();
@@ -292,14 +298,6 @@
     getModelList();
     getJetList();
     getAircraftList();
-
-    $('#continent').change(function () {
-        getCountryList();
-    });
-
-    $('#country').change(function () {
-        getCityList();
-    });
 
     function getCountryList() {
         continent = $('#continent').val();
@@ -354,14 +352,6 @@
         });
     }
 
-    $('#jet').change(function () {
-        getMakeList();
-    });
-
-    $('#make').change(function () {
-        getModelList();
-    });
-
     function getMakeList() {
         jet = $('#jet').val();
         $.ajax({
@@ -408,7 +398,8 @@
             dataType: 'json',
             success: function (result) {
                 aircraftList = result;
-                testData();
+                // testData();
+                getData();
             }
         });
     }
@@ -518,8 +509,13 @@
                 for (let j = 0; j < statistics.length; j++) {
                     let year = statistics[j].year;
                     let month = statistics[j].month;
+                    let date = year + '-' + (month > 10 ? month : '0' + month);
 
-                    if (date !== '' && (date !== year + '-' + (month > 10 ? month : '0' + month))) {
+                    if (start !== '' && (date + '-01' < start)) {
+                        continue;
+                    }
+
+                    if (end !== '' && (date + '-31' > end)) {
                         continue;
                     }
 
@@ -535,7 +531,7 @@
                                 }
                                 if (movement > airportList[icaoCode]['popular_movement']) {
                                     airportList[icaoCode]['popular_movement'] = movement;
-                                    airportList[icaoCode]['popular_aircraft'] = data[i]['typeDescription'];
+                                    airportList[icaoCode]['popular_aircraft'] = aircraftModelList[typeDescription]['aircraft'];
                                 }
                                 airportList[icaoCode]['count'] = (airportList[icaoCode]['count'] ?? 0) + movement;
                                 if (!finalList.includes(icaoCode)) {
@@ -713,6 +709,46 @@
         });
     }
 
+    $('#continent').change(function () {
+        getCountryList();
+        onSearch();
+    });
+
+    $('#country').change(function () {
+        getCityList();
+        onSearch();
+    });
+
+    $('#city').change(function () {
+        onSearch();
+    });
+
+    $('#airport').on('input', function () {
+        onSearch();
+    });
+
+    $('#jet').change(function () {
+        getMakeList();
+        onSearch();
+    });
+
+    $('#make').change(function () {
+        getModelList();
+        onSearch();
+    });
+
+    $('#model').change(function () {
+        onSearch();
+    });
+
+    $('#start').change(function () {
+        onSearch();
+    });
+
+    $('#end').change(function () {
+        onSearch();
+    });
+
     function onSearch() {
         airport = $('#airport').val();
         continent = $('#continent').val();
@@ -721,7 +757,8 @@
         jet = $('#jet').val();
         make = $('#make').val();
         model = $('#model').val();
-        date = $('#date').val();
+        start = $('#start').val();
+        end = $('#start').val();
         getAirportList();
     }
 </script>
