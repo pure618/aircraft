@@ -6,6 +6,7 @@ class Server
 
     public function __construct()
     {
+        set_time_limit(0);
         $host = "localhost";
         $username = "root";
         $password = "";
@@ -18,71 +19,194 @@ class Server
         }
     }
 
-    public function _is_time_over($date1, $date2)
+    public function __destruct()
     {
-        $d1 = new DateTime($date1);
-        $d2 = new DateTime($date2);
-
-        $interval = $d2->diff($d1);
-
-        $month = $interval->format('%m');
-        return $month >= 1;
+        // TODO: Implement __destruct() method.
+        $this->conn->close();
     }
 
-    public function _write_to_files()
+    public function write_to_server()
     {
-        $data = ['reg_time' => date('Y-m-d H:i:s')];
-        file_put_contents('regtime.json', json_encode($data));
-
         $authorization = "Authorization: Bearer 7af24899d824abfefac14930baf681f40e4427fd";
 
-        $sql = "SELECT distinct icao FROM tb_aircraft";
-        $fetch_result = $this->conn->query($sql);
+        $this->conn->begin_transaction();
 
-        $aircraft_list = [];
-        foreach ($fetch_result as $item) {
-            $aircraft_list[] = $item['icao'];
-        }
+        try {
 
-        foreach ($aircraft_list as $aircraft) {
-            $ch = curl_init("https://api.radarbox.com/v2/aircraft/search?aircraftType=${aircraft}");
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json', $authorization));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            $result = curl_exec($ch); // Execute the cURL statement
-            file_put_contents("$aircraft.json", $result);
-            curl_close($ch);
-        }
-    }
+            $sql = "delete from tb_output";
+            $this->conn->query($sql);
 
-    public function read_data()
-    {
-        $regtime_data = file_get_contents('regtime.json');
+            $sql = "delete from tb_output_detail";
+            $this->conn->query($sql);
 
-        if ($regtime_data === false) {
-            $this->_write_to_files();
-            die ('wait');
-        } else {
-            $data = json_decode($regtime_data, true);
+            $sql = "SELECT distinct icao FROM tb_aircraft";
+            $fetch_result = $this->conn->query($sql);
 
-            if ($this->_is_time_over($data['reg_time'], date('Y-m-d H:i:s'))) {
-                $this->_write_to_files();
-                die ('wait');
+            $aircraft_list = [];
+            foreach ($fetch_result as $item) {
+                $aircraft_list[] = $item['icao'];
             }
-            die ('success');
+
+            foreach ($aircraft_list as $aircraft) {
+                $ch = curl_init("https://api.radarbox.com/v2/aircraft/search?aircraftType=${aircraft}");
+                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json', $authorization));
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                $json = curl_exec($ch); // Execute the cURL statement
+
+                $result = json_decode($json, true);
+                $this->_insert_api_result_to_db($result);
+                curl_close($ch);
+                $this->conn->commit();
+            }
+        } catch (mysqli_sql_exception $exception) {
+            $this->conn->rollback();
+            throw $exception;
         }
     }
 
-    public function get_aircraft_list()
+    public function get_table_data()
     {
-        $sql = "SELECT distinct icao FROM tb_aircraft";
-        $fetch_result = $this->conn->query($sql);
+        require_once "SSP.php";
+        // Build the SQL query string from the request
+        $limit = SSP::limit($_REQUEST);
+        $columns = ["airport_name", "icao", "city", "country", "movements", "most_popular"];
+        $columnIndex = $_REQUEST["order"][0]["column"];
+        $direction = $_REQUEST["order"][0]["dir"];
+        $orderby = "order by ${columns[$columnIndex]} $direction";
 
-        $aircraft_list = [];
-        foreach ($fetch_result as $item) {
-            $aircraft_list[] = $item['icao'];
+        $where = "";
+        $airport = $_POST['airport'];
+        $continent = $_POST['continent'];
+        $country = $_POST['country'];
+        $city = $_POST['city'];
+        $jet = $_POST['jet'];
+        $make = $_POST['make'];
+        $model = $_POST['model'];
+        $start_dt = $_POST['start_dt'];
+        $end_dt = $_POST['end_dt'];
+
+        if (!empty($airport)) {
+            $where .= " and airport_name like '%$airport%'";
+        }
+        if (!empty($continent)) {
+            $where .= " and continent = '$continent'";
+        }
+        if (!empty($country)) {
+            $where .= " and country = '$country'";
+        }
+        if (!empty($city)) {
+            $where .= " and city = '$city'";
+        }
+        if (!empty($jet)) {
+            $where .= " and jet = '$jet'";
+        }
+        if (!empty($make)) {
+            $where .= " and make = '$make'";
+        }
+        if (!empty($model)) {
+            $where .= " and model = '$model'";
+        }
+        if (!empty($start_dt)) {
+            $where .= " and date >= '$start_dt'";
+        }
+        if (!empty($end_dt)) {
+            $where .= " and date <= '$end_dt'";
         }
 
-        die (json_encode($aircraft_list));
+        // Main query to actually get the data
+        $sql = <<<EOT
+            SELECT
+                airport_name,
+                airport_icao,
+                city,
+                country,
+                sum(movements) as movements,
+                aircraft as most_popular,
+                max(movements) as max_movements
+            FROM
+                tb_data
+            WHERE 1=1
+                $where
+            GROUP BY airport_icao
+            $orderby
+            $limit
+EOT;
+
+        $list = $this->conn->query($sql)->fetch_all();
+
+        $length_sql = <<<EOT
+            SELECT count(distinct airport_icao) as cnt
+            FROM
+                tb_data
+            WHERE 1=1
+                $where
+EOT;
+
+        // Total data set length
+        $recordsTotal = ($this->conn->query($length_sql)->fetch_assoc())["cnt"];
+
+
+        //Total movements(year)
+        $data = SSP::output($_REQUEST, $list, $recordsTotal, $recordsTotal);
+
+        $year_movements_sql = <<<EOT
+            select sum(movements) as movements
+            from tb_data
+            WHERE `date` like concat(year(now()), '%')
+            $where
+EOT;
+
+
+        //Total movements(last month)
+        $month_movements_sql = <<<EOT
+            select sum(movements) as movements
+            from tb_data as A
+            WHERE 1=1
+            $where
+            group by A.`date`
+            order by A.`date` desc
+            limit 1
+EOT;
+
+        //Map Data
+        $map_data_sql = <<<EOT
+            select
+                sum(movements) as movements,
+                lat,
+                lng
+            from tb_data
+            WHERE 1=1 $where
+            group by airport_icao
+EOT;
+
+        $graph_data_sql = <<<EOT
+            select
+                `date`,
+                sum(movements) as movements
+            from tb_data
+            WHERE 1=1
+            $where
+            group by `date`
+EOT;
+
+        $tmp_graph_data = $this->conn->query($graph_data_sql);
+        $graph_data = [];
+        foreach ($tmp_graph_data as $item) {
+            $tmp = explode("-", $item["date"]);
+            $year = $tmp[0];
+            $month = intval($tmp[1]);
+            $graph_data[$year][$month] = $item['movements'];
+        }
+
+
+        $data["yearMovements"] = intval(($this->conn->query($year_movements_sql)->fetch_assoc())["movements"] ?? 0);
+        $data["monthMovements"] = intval(($this->conn->query($month_movements_sql)->fetch_assoc())["movements"] ?? 0);
+        $data["mapData"] = $this->conn->query($map_data_sql)->fetch_all(MYSQLI_ASSOC);
+        $data['graphData'] = $graph_data;
+        /*
+         * Output
+         */
+        echo json_encode($data);
     }
 
     public function get_country_list()
@@ -92,6 +216,7 @@ class Server
         if (!empty($continent)) {
             $sql .= " and continent = '${continent}'";
         }
+        $sql .= " order by country";
         $fetch_result = $this->conn->query($sql);
 
         $result = [];
@@ -113,6 +238,7 @@ class Server
         if (!empty($country)) {
             $sql .= " and country = '${country}'";
         }
+        $sql .= " order by city";
         $fetch_result = $this->conn->query($sql);
 
         $result = [];
@@ -125,7 +251,7 @@ class Server
 
     public function get_jet_list()
     {
-        $sql = "SELECT distinct aircraft_class FROM tb_aircraft WHERE 1=1";
+        $sql = "SELECT distinct aircraft_class FROM tb_aircraft WHERE 1=1 order by aircraft_class";
         $fetch_result = $this->conn->query($sql);
 
         $result = [];
@@ -143,6 +269,7 @@ class Server
         if (!empty($jet)) {
             $sql .= " and aircraft_class = '${jet}'";
         }
+        $sql .= " order by make";
 
         $fetch_result = $this->conn->query($sql);
 
@@ -165,6 +292,7 @@ class Server
         if (!empty($make)) {
             $sql .= " and make = '${make}'";
         }
+        $sql .= " order by model";
 
         $fetch_result = $this->conn->query($sql);
 
@@ -195,6 +323,7 @@ class Server
         if (!empty($airport)) {
             $sql .= " and airport_name like '%${airport}%'";
         }
+        $sql .= " order by airport_name";
         $fetch_result = $this->conn->query($sql);
 
         $result = [];
@@ -205,30 +334,123 @@ class Server
         die (json_encode($result));
     }
 
-    public function get_aircraft_model_list()
+    public function json_to_db()
     {
-        $make = $_GET['make'];
-        $jet = $_GET['jet'];
-        $model = $_GET['model'];
-
-        $sql = "SELECT * FROM `tb_aircraft` where 1=1";
-        if (!empty($make)) {
-            $sql .= " and make = '${make}'";
-        }
-        if (!empty($model)) {
-            $sql .= " and country = '${model}'";
-        }
-        if (!empty($jet)) {
-            $sql .= " and aircraft_class = '${jet}'";
-        }
+        $sql = "SELECT distinct icao FROM tb_aircraft";
         $fetch_result = $this->conn->query($sql);
 
-        $result = [];
+        $aircraft_list = [];
         foreach ($fetch_result as $item) {
-            $result[$item['api_name']] = $item;
+            $aircraft_list[] = $item['icao'];
         }
 
-        die (json_encode($result));
+        $this->conn->begin_transaction();
+
+        try {
+
+            foreach ($aircraft_list as $aircraft) {
+                if (!file_exists("$aircraft.json")) {
+                    continue;
+                }
+                $json = file_get_contents("$aircraft.json");
+                $result = json_decode($json, true);
+                if (!array_key_exists("aircraft", $result)) {
+                    continue;
+                }
+                $this->_insert_api_result_to_db($result);
+            }
+            $this->conn->commit();
+            die ("success");
+        } catch (mysqli_sql_exception $exception) {
+            $this->conn->rollback();
+            throw $exception;
+        }
+    }
+
+    public function _insert_api_result_to_db($api_result)
+    {
+        $api_result_list = $api_result["aircraft"];
+
+        $airport_list = [];
+        $aircraft_list = [];
+
+        $sql = "select * from tb_aircraft";
+        $aircraft_result = $this->conn->query($sql);
+
+
+        foreach ($aircraft_result as $item) {
+            $aircraft_list[$item["icao"] . "_" . $item["api_name"]] = $item;
+        }
+
+        $sql = "select * from tb_airport";
+        $airport_result = $this->conn->query($sql);
+        foreach ($airport_result as $item) {
+            $airport_list[$item["icao"]] = $item;
+        }
+
+        $result = [];
+
+        foreach ($api_result_list as $aircraft) {
+            $aircraft_icao = $aircraft["typeIcao"];
+            $type_description = $aircraft["typeDescription"] ?? "";
+
+            if (!empty($aircraft["aircraftStatitics"])) {
+                foreach ($aircraft["aircraftStatitics"] as $statitics) {
+                    $year = $statitics["year"];
+                    $month = $statitics["month"];
+                    $date = $year . "-" . ($month >= 10 ? $month : "0" . $month);
+                    if (!empty($statitics["airportMovements"])) {
+                        foreach ($statitics["airportMovements"] as $airportMovement) {
+                            $airport_icao = $airportMovement["icaoCode"];
+                            $movements = $airportMovement["movements"];
+                            $idx = $aircraft_icao . "_" . $type_description . "_" . $airport_icao . "_" . $date;
+                            $result[$idx] = ($result[$idx] ?? 0) + $movements;
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach (array_keys($result) as $key) {
+            $tmp = explode("_", $key);
+            $aircraft_icao = $tmp[0];
+            $type_description = $tmp[1];
+            $airport_icao = $tmp[2];
+            $date = $tmp[3];
+            $movements = $result[$key];
+
+            $aircraft = $aircraft_list[$aircraft_icao . "_" . $type_description] ?? "";
+            $airport = $airport_list[$airport_icao] ?? "";
+
+            if (!empty($aircraft) && !empty($airport)) {
+
+                $sql = <<<EOT
+                    insert into tb_data
+                        (jet, make, model, aircraft, `date`, airport_icao, airport_name, continent, country, city, lat, lng, movements)
+                    values
+                    (
+                        "${aircraft["aircraft_class"]}",
+                        "${aircraft["make"]}",
+                        "${aircraft["model"]}",
+                        "${aircraft["aircraft"]}",
+                        "${date}",
+                        "${airport["icao"]}",
+                        "${airport["airport_name"]}",
+                        "${airport["continent"]}",
+                        "${airport["country"]}",
+                        "${airport["city"]}",
+                        ${airport["lat"]},
+                        ${airport["lng"]},
+                        ${movements}
+                    )
+EOT;
+
+                if (!$this->conn->query($sql)) {
+                    echo "Error: " . $sql . "<br>" . $this->conn->error;
+                    exit;
+                }
+            }
+        }
     }
 }
 
@@ -236,11 +458,11 @@ $server = new Server();
 
 $f = $_GET['f'];
 switch ($f) {
-    case 'read_data':
-        $server->read_data();
+    case 'write_to_server':
+        $server->write_to_server();
         break;
-    case 'get_aircraft_list':
-        $server->get_aircraft_list();
+    case 'get_table_data':
+        $server->get_table_data();
         break;
     case 'get_country_list':
         $server->get_country_list();
@@ -260,7 +482,7 @@ switch ($f) {
     case 'get_jet_list':
         $server->get_jet_list();
         break;
-    case 'get_aircraft_model_list':
-        $server->get_aircraft_model_list();
+    case 'json_to_db':
+        $server->json_to_db();
         break;
 }

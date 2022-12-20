@@ -4,14 +4,14 @@
  Source Server         : localhost
  Source Server Type    : MariaDB
  Source Server Version : 100419 (10.4.19-MariaDB)
- Source Host           : localhost:3306
+ Source Host           : 127.0.0.1:3306
  Source Schema         : aircraft
 
  Target Server Type    : MariaDB
  Target Server Version : 100419 (10.4.19-MariaDB)
  File Encoding         : 65001
 
- Date: 15/12/2022 03:36:41
+ Date: 20/12/2022 21:43:33
 */
 
 SET NAMES utf8mb4;
@@ -26,7 +26,7 @@ CREATE TABLE `tb_aircraft`  (
   `make` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `model` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `aircraft_class` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `icao` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `icao` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `api_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`aircraft`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
@@ -183,7 +183,7 @@ INSERT INTO `tb_aircraft` VALUES ('Pilatus PC-24', 'Pilatus', 'PC-24', 'Medium',
 -- ----------------------------
 DROP TABLE IF EXISTS `tb_airport`;
 CREATE TABLE `tb_airport`  (
-  `icao` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `icao` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `airport_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `city` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `country` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -8925,5 +8925,31 @@ INSERT INTO `tb_airport` VALUES ('ZYQQ', 'Qiqihar/Sanjiazi', 'Qiqihar', 'China',
 INSERT INTO `tb_airport` VALUES ('ZYTL', 'Dalian/Zhoushuizi Intl', 'Dalian', 'China', 'Asia', 38.96666667, 121.5344444);
 INSERT INTO `tb_airport` VALUES ('ZYTX', 'Shenyang/Taoxian', 'Shenyang', 'China', 'Asia', 41.63472222, 123.4836111);
 INSERT INTO `tb_airport` VALUES ('ZYYJ', 'Yanji', 'Yanji', 'China', 'Asia', 42.86916667, 129.45);
+
+-- ----------------------------
+-- Table structure for tb_data
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_data`;
+CREATE TABLE `tb_data`  (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `jet` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `make` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `model` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `aircraft` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `date` char(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `airport_icao` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `airport_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `continent` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `country` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `city` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `lat` double NOT NULL,
+  `lng` double NOT NULL,
+  `movements` int(11) NOT NULL,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of tb_data
+-- ----------------------------
 
 SET FOREIGN_KEY_CHECKS = 1;
