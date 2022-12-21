@@ -7,6 +7,7 @@ class Server
     public function __construct()
     {
         set_time_limit(0);
+        ini_set('memory_limit', '1024M');
         $host = "localhost";
         $username = "root";
         $password = "";
@@ -56,8 +57,8 @@ class Server
                 $result = json_decode($json, true);
                 $this->_insert_api_result_to_db($result);
                 curl_close($ch);
-                $this->conn->commit();
             }
+            $this->conn->commit();
         } catch (mysqli_sql_exception $exception) {
             $this->conn->rollback();
             throw $exception;
