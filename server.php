@@ -34,10 +34,7 @@ class Server
 
         try {
 
-            $sql = "delete from tb_output";
-            $this->conn->query($sql);
-
-            $sql = "delete from tb_output_detail";
+            $sql = "delete from tb_data";
             $this->conn->query($sql);
 
             $sql = "SELECT distinct icao FROM tb_aircraft";
@@ -133,7 +130,20 @@ class Server
             $limit
 EOT;
 
-        $list = $this->conn->query($sql)->fetch_all();
+        $list = $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+
+        $result = [];
+        foreach ($list as $item) {
+            $tmp = [];
+            $idx = 0;
+            $tmp[$idx++] = $item['airport_name'];
+            $tmp[$idx++] = $item['airport_icao'];
+            $tmp[$idx++] = $item['city'];
+            $tmp[$idx++] = $item['country'];
+            $tmp[$idx++] = number_format($item['movements']);
+            $tmp[$idx++] = $item['most_popular'];
+            $result[] = $tmp;
+        }
 
         $length_sql = <<<EOT
             SELECT count(distinct airport_icao) as cnt
@@ -143,12 +153,21 @@ EOT;
                 $where
 EOT;
 
+        $max_sql = <<<EOT
+            SELECT max(movements) as max_intensity
+            FROM
+                tb_data
+            WHERE 1=1
+                $where
+EOT;
+
         // Total data set length
         $recordsTotal = ($this->conn->query($length_sql)->fetch_assoc())["cnt"];
+        $maxIntensity = ($this->conn->query($max_sql)->fetch_assoc())["max_intensity"];
 
 
         //Total movements(year)
-        $data = SSP::output($_REQUEST, $list, $recordsTotal, $recordsTotal);
+        $data = SSP::output($_REQUEST, $result, $recordsTotal, $recordsTotal);
 
         $year_movements_sql = <<<EOT
             select sum(movements) as movements
@@ -204,6 +223,7 @@ EOT;
         $data["monthMovements"] = intval(($this->conn->query($month_movements_sql)->fetch_assoc())["movements"] ?? 0);
         $data["mapData"] = $this->conn->query($map_data_sql)->fetch_all(MYSQLI_ASSOC);
         $data['graphData'] = $graph_data;
+        $data['maxIntensity'] = $maxIntensity;
         /*
          * Output
          */

@@ -249,12 +249,6 @@
         mapTypeId: google.maps.MapTypeId.TERRAIN
     });
 
-    $(document).ajaxStart(function () {
-        $("#loader").show();
-    }).ajaxSuccess(function () {
-        $("#loader").fadeOut();
-    });
-
     getCountryList();
     getJetList();
     $('.input-daterange').datepicker({
@@ -282,14 +276,20 @@
                     d.model = $('#model').val();
                     d.start_dt = $('#start_dt').val();
                     d.end_dt = $('#end_dt').val();
-                }
+                },
+                beforeSend: function () {
+                    $("#loader").show();
+                },
+                complete: function () {
+                    $('#loader').fadeOut();
+                },
             },
             order: [[4, 'desc']],
             drawCallback: function( settings ) {
                 $('#total_route').text(formatNumber(settings.json.recordsTotal));
                 $('#year_movements').text(formatNumber(settings.json.yearMovements));
                 $('#month_movements').text(formatNumber(settings.json.monthMovements));
-                drawHeatMap(settings.json.mapData);
+                drawHeatMap(settings.json.mapData, settings.json.maxIntensity);
                 drawGraph(document.getElementById('graph'), settings.json.graphData);
             }
         });
@@ -391,7 +391,7 @@
     }
 
     var heatMap;
-    function drawHeatMap(heatMapData) {
+    function drawHeatMap(heatMapData, maxIntensity) {
         if (heatMap) {
             heatMap.setMap(null);
         }
@@ -402,7 +402,8 @@
 
         heatMap = new google.maps.visualization.HeatmapLayer({
             data: data,
-            radius: 15,
+            radius: 8,
+            maxIntensity: maxIntensity * 100,
             map: map,
         });
     }
