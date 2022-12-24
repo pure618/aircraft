@@ -67,7 +67,7 @@ class Server
         require_once "SSP.php";
         // Build the SQL query string from the request
         $limit = SSP::limit($_REQUEST);
-        $columns = ["airport_name", "icao", "city", "country", "movements", "most_popular"];
+        $columns = ["airport_name", "icao", "city", "country", "sum_movements", "most_popular"];
         $columnIndex = $_REQUEST["order"][0]["column"];
         $direction = $_REQUEST["order"][0]["dir"];
         $orderby = "order by ${columns[$columnIndex]} $direction";
@@ -118,11 +118,19 @@ class Server
                 airport_icao,
                 city,
                 country,
-                sum(movements) as movements,
                 aircraft as most_popular,
-                max(movements) as max_movements
+                B.sum_movements
             FROM
-                tb_data
+                tb_data as A
+            left join (
+                select
+                    id,
+                    sum(movements) as sum_movements,
+                    max(movements) as movements
+                from tb_data
+                where 1=1 $where
+                group by airport_icao
+            ) as B on A.id = B.id and A.movements = B.movements
             WHERE 1=1
                 $where
             GROUP BY airport_icao
@@ -140,7 +148,7 @@ EOT;
             $tmp[$idx++] = $item['airport_icao'];
             $tmp[$idx++] = $item['city'];
             $tmp[$idx++] = $item['country'];
-            $tmp[$idx++] = number_format($item['movements']);
+            $tmp[$idx++] = number_format($item['sum_movements']);
             $tmp[$idx++] = $item['most_popular'];
             $result[] = $tmp;
         }
