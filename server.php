@@ -119,13 +119,12 @@ class Server
                 city,
                 country,
                 aircraft as most_popular,
-                B.sum_movements
+                sum(A.movements) as sum_movements
             FROM
                 tb_data as A
             left join (
                 select
                     id,
-                    sum(movements) as sum_movements,
                     max(movements) as movements
                 from tb_data
                 where 1=1 $where
