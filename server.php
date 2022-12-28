@@ -114,27 +114,31 @@ class Server
         // Main query to actually get the data
         $sql = <<<EOT
             SELECT
-                airport_name,
-                airport_icao,
-                city,
-                country,
-                aircraft as most_popular,
-                sum(A.movements) as sum_movements
+                A.airport_name,
+                A.airport_icao,
+                A.city,
+                A.country,
+                A.sum_movements,
+                B.aircraft as most_popular
             FROM
-                tb_data as A
-            left join (
-                select
-                    id,
-                    max(movements) as movements
-                from tb_data
+                (
+                SELECT
+                    airport_name,
+                    airport_icao,
+                    city,
+                    country,
+                    max( movements ) AS max_movements,
+                    sum( movements ) AS sum_movements 
+                FROM
+                    tb_data 
                 where 1=1 $where
-                group by airport_icao
-            ) as B on A.id = B.id and A.movements = B.movements
-            WHERE 1=1
-                $where
-            GROUP BY airport_icao
-            $orderby
-            $limit
+                GROUP BY
+                    airport_icao 
+                $orderby
+                $limit 
+                ) AS A
+                LEFT JOIN ( SELECT aircraft, movements, airport_icao FROM tb_data where 1=1) AS B
+                ON A.max_movements = B.movements AND A.airport_icao = B.airport_icao
 EOT;
 
         $list = $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
