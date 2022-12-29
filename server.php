@@ -135,10 +135,13 @@ class Server
                 GROUP BY
                     airport_icao 
                 $orderby
-                $limit 
+                $limit
                 ) AS A
-                LEFT JOIN ( SELECT aircraft, movements, airport_icao FROM tb_data where 1=1) AS B
+                LEFT JOIN ( SELECT aircraft, movements, airport_icao FROM tb_data where 1=1 $where) AS B
                 ON A.max_movements = B.movements AND A.airport_icao = B.airport_icao
+                GROUP BY
+                    airport_icao 
+                $orderby
 EOT;
 
         $list = $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
